@@ -30,12 +30,13 @@ type Grouper interface {
 
 // Processor processes files according to import grouping rules.
 type Processor struct {
-	grouper Grouper
+	grouper    Grouper
+	sortByName bool
 }
 
 // NewProcessor creates a new Processor with a given group definition.
-func NewProcessor(grouper Grouper) *Processor {
-	return &Processor{grouper}
+func NewProcessor(grouper Grouper, sortByName bool) *Processor {
+	return &Processor{grouper, sortByName}
 }
 
 // ValidationError is an error about incorrect import grouping.

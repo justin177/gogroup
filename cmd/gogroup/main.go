@@ -5,86 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
-	"strings"
-
-	"gogroup"
 	"strconv"
+
+	"github.com/justin177/gogroup"
 )
-
-type grouper struct {
-	// The group numbers of prefixed packages.
-	prefixes map[int]string
-
-	// The group numbers of standard packages and unidentified packages.
-	std, other int
-
-	// The next integer to assign
-	next int
-}
-
-func newGrouper() *grouper {
-	return &grouper{
-		prefixes: make(map[int]string),
-		std:      0,
-		other:    1,
-		next:     2,
-	}
-}
-
-func (g *grouper) Group(pkg string) int {
-	for n, prefix := range g.prefixes {
-		if strings.HasPrefix(pkg, prefix) {
-			return n
-		}
-	}
-
-	// A dot distinguishes non-standard packages.
-	if strings.Contains(pkg, ".") {
-		return g.other
-	} else {
-		return g.std
-	}
-}
-
-func (g *grouper) wasSet() bool {
-	return g.next > 2
-}
-
-func (g *grouper) String() string {
-	parts := []string{}
-	remain := len(g.prefixes)
-	for i := 0; i <= g.std || i <= g.other || remain > 0; i++ {
-		if g.std == i {
-			parts = append(parts, "std")
-		} else if g.other == i {
-			parts = append(parts, "other")
-		} else if p, ok := g.prefixes[i]; ok {
-			parts = append(parts, fmt.Sprintf("prefix=%s", p))
-			remain--
-		}
-	}
-	return strings.Join(parts, ",")
-}
-
-var rePrefix = regexp.MustCompile(`^prefix=(.*)$`)
-
-func (g *grouper) Set(s string) error {
-	parts := strings.Split(s, ",")
-	for _, p := range parts {
-		if p == "std" {
-			g.std = g.next
-		} else if p == "other" {
-			g.other = g.next
-		} else if match := rePrefix.FindStringSubmatch(p); match != nil {
-			g.prefixes[g.next] = match[1]
-		} else {
-			return fmt.Errorf("Unknown order specification '%s'", p)
-		}
-		g.next++
-	}
-	return nil
-}
 
 const (
 	statusError       = 1
@@ -164,7 +88,8 @@ func rewriteAll(proc *gogroup.Processor, files []string) {
 
 func main() {
 	rewrite := false
-	gr := newGrouper()
+	sortByName := false
+	gr := gogroup.NewGrouper()
 
 	flag.Usage = func() {
 		// Hard to get flag to format long usage well, so just put everything here.
@@ -185,7 +110,9 @@ Usage: group-imports [OPTIONS] FILE...
 
       - std: Standard library imports
       - prefix=PREFIX: Imports whose path starts with PREFIX
+      - regexp=REGEXP: Imports whose path matchs with REGEXP
       - other: Imports that match no other specification
+      - named: Imports that with name
 
       These groups can be specified in one comma-separated argument, or
       multiple arguments. Default: std,other
@@ -195,6 +122,7 @@ Usage: group-imports [OPTIONS] FILE...
 
 	flag.BoolVar(&rewrite, "rewrite", false, "")
 	flag.Var(gr, "order", "")
+	flag.BoolVar(&sortByName, "sortByName", false, "")
 
 	flag.Parse()
 	if flag.NArg() == 0 {
@@ -203,7 +131,7 @@ Usage: group-imports [OPTIONS] FILE...
 		os.Exit(statusHelp)
 	}
 
-	proc := gogroup.NewProcessor(gr)
+	proc := gogroup.NewProcessor(gr, sortByName)
 	if rewrite {
 		rewriteAll(proc, flag.Args())
 	} else {

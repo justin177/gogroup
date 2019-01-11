@@ -2,12 +2,11 @@ package gogroup
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
-	"sort"
-
-	"bytes"
 	"io/ioutil"
+	"sort"
 
 	"golang.org/x/tools/imports"
 )
@@ -40,8 +39,33 @@ func writeLines(w io.Writer, lines []string) error {
 // sorted.
 // Input is a set of grouped imports, and all the lines of text in the file.
 // Output is the lines of text that make up the sorted import section.
-func sortedImportLines(gs groupedImports, lines []string) []string {
-	sort.Sort(gs)
+func sortedImportLines(gs groupedImports, lines []string, sortByName bool) []string {
+	sort.Slice(gs, func(i, j int) bool {
+		if gs[i].group < gs[j].group {
+			return true
+		}
+		if gs[i].group > gs[j].group {
+			return false
+		}
+		if gs[i].named == false && gs[j].named == true {
+			return true
+		}
+		if gs[i].named == true && gs[j].named == false {
+			return false
+		}
+		if sortByName && gs[i].named == true && gs[j].named == true {
+			if gs[i].name < gs[j].name {
+				return true
+			}
+			if gs[i].name > gs[j].name {
+				return false
+			}
+		}
+		if gs[i].path < gs[j].path {
+			return true
+		}
+		return false
+	})
 
 	ret := []string{}
 	var prev *groupedImport
@@ -60,7 +84,7 @@ func sortedImportLines(gs groupedImports, lines []string) []string {
 // Given the contents of a source file and the parsed imports, yield
 // the contents of the file with imports sorted and grouped, as an
 // io.Reader.
-func fixImports(src []byte, gs groupedImports) (io.Reader, error) {
+func fixImports(src []byte, gs groupedImports, sortByName bool) (io.Reader, error) {
 	lines, err := readLines(bytes.NewReader(src))
 	if err != nil {
 		return nil, err
@@ -72,7 +96,7 @@ func fixImports(src []byte, gs groupedImports) (io.Reader, error) {
 	// Need to start a new slice, or we may modify lines as we append.
 	out := []string{}
 	out = append(out, lines[:min]...)
-	out = append(out, sortedImportLines(gs, lines)...)
+	out = append(out, sortedImportLines(gs, lines, sortByName)...)
 	out = append(out, lines[max+1:]...)
 
 	var dst bytes.Buffer
@@ -101,7 +125,7 @@ func (p *Processor) repair(fileName string, r io.Reader) (io.Reader, error) {
 	}
 
 	// Generate the fixed version.
-	dst, err := fixImports(src, gs)
+	dst, err := fixImports(src, gs, p.sortByName)
 	if err != nil {
 		return nil, err
 	}
