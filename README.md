@@ -163,4 +163,17 @@ All of these allow doc comments and named imports.
 			"another/thing"
 		)
 		```
-		
+
+## use with IDEA
+
+0. go install **gogroup**
+1. open Preferences->Tools->File Watchers
+2. add -> go fmt
+3. edit popup
+   - Name: gogroup
+   - File Type: go
+   - Scope: Current File
+   - Program: gogroup
+   - Arguments: -order std,other,named -rewrite $FilePath$
+   - others: keep as it is
+
